@@ -1,3 +1,15 @@
-# Personal configuration (contains private information)
+# Personal configuration (contains sensitive info)
 config.js
+
+# Generated invoices
 *.pdf
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories
+.idea/
+.vscode/
+*.swp
+*.swo
