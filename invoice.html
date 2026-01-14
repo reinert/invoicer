@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice Generator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="invoice.css">
+</head>
+<body>
+    <div class="page-actions">
+        <div class="actions-left">
+            <button class="edit-mode-toggle" onclick="toggleEditMode()">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                </svg>
+                <span>Edit Mode</span>
+            </button>
+            <div class="currency-selector">
+                <label for="currency-select">Currency</label>
+                <select id="currency-select" onchange="changeCurrency(this.value)">
+                    <option value="USD" selected>US$ (USD)</option>
+                    <option value="EUR">€ (EUR)</option>
+                    <option value="GBP">£ (GBP)</option>
+                    <option value="BRL">R$ (BRL)</option>
+                    <option value="JPY">¥ (JPY)</option>
+                    <option value="CAD">C$ (CAD)</option>
+                    <option value="AUD">A$ (AUD)</option>
+                    <option value="CHF">CHF (CHF)</option>
+                </select>
+            </div>
+        </div>
+        <button class="download-btn" onclick="downloadPDF()">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            Download PDF
+        </button>
+    </div>
+
+    <div class="edit-hint">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+        </svg>
+        <span>Edit mode active — Click on highlighted fields to edit. Changes are reflected in real-time.</span>
+    </div>
+
+    <div class="invoice-container">
+        <header class="invoice-header">
+            <div class="company-info">
+                <h1 class="editable" contenteditable="false" id="company-name">Your Company Name</h1>
+                <p class="editable" contenteditable="false" id="company-id">XX.XXX.XXX/XXXX-XX</p>
+                <p class="editable" contenteditable="false" id="company-address-line-1">123 Main Street, Suite 100</p>
+                <p class="editable" contenteditable="false" id="company-address-line-2">City, State ZIP</p>
+                <p class="editable" contenteditable="false" id="company-address-country">Country</p>
+                <p class="editable" contenteditable="false" id="company-email">email@example.com</p>
+            </div>
+            <div class="invoice-badge">
+                <div class="invoice-label">Invoice</div>
+                <div class="invoice-number">Nº <span class="editable" contenteditable="false" id="invoice-number"></span></div>
+            </div>
+        </header>
+
+        <main class="invoice-body">
+            <div class="invoice-meta">
+                <div class="meta-section">
+                    <h2>Bill To</h2>
+                    <div class="value editable" contenteditable="false" id="bill-to-name">Client Name</div>
+                    <div class="value-lines">
+                        <div class="editable" contenteditable="false" id="bill-to-street">456 Client Avenue</div>
+                        <div class="editable" contenteditable="false" id="bill-to-city">Client City, State ZIP</div>
+                        <div class="editable" contenteditable="false" id="bill-to-country">Country</div>
+                    </div>
+                </div>
+                <div class="meta-section">
+                    <div class="date-toggle">
+                        <label class="toggle-control">
+                            <input type="checkbox" id="show-due-date">
+                            <span>Include Due Date</span>
+                        </label>
+                    </div>
+                    <div class="dates-grid">
+                        <div class="date-item">
+                            <div class="label">Invoice Date</div>
+                            <div class="value editable" contenteditable="false" id="invoice-date"></div>
+                        </div>
+                        <div class="date-item" id="due-date-item">
+                            <div class="label">Due Date</div>
+                            <div class="value editable" contenteditable="false" id="due-date"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="invoice-items">
+                <div class="items-header">
+                    <span>Description</span>
+                    <span>Amount</span>
+                </div>
+                <div class="items-list" id="items-list">
+                    <div class="item-row" data-item>
+                        <div class="item-details">
+                            <h3 class="editable" contenteditable="false">Service Title</h3>
+                            <p>
+                                <span class="editable period-note" contenteditable="false">Service description for</span> <p class="service-period-range"></p>.
+                            </p>
+                        </div>
+                        <div class="item-amount">
+                        <span class="currency-symbol">US$</span>
+                        <span class="amount-value editable" contenteditable="false" data-amount>0.00</span>
+                    </div>
+                        <button class="remove-item-btn" onclick="removeItem(this)" title="Remove item">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <button class="add-item-btn" onclick="addItem()">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                    Add Item
+                </button>
+            </div>
+
+            <div class="invoice-total">
+                <div class="total-box">
+                    <div class="total-label">TOTAL AMOUNT</div>
+                    <div class="total-amount">
+                        <span class="currency-symbol">US$</span>
+                        <span id="total-amount">0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="payment-details">
+                <div class="details-grid">
+                    <div class="detail-item">
+                        <div class="label">Bank name:</div>
+                        <div class="value editable" contenteditable="false" id="bank-name">Bank Name</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="label">Account Type:</div>
+                        <div class="value editable" contenteditable="false" id="bank-account-type">Checking</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="label">Account holder name:</div>
+                        <div class="value editable" contenteditable="false" id="bank-legal-name">Account Holder Name</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="label">Account number:</div>
+                        <div class="value editable" contenteditable="false" id="bank-account-number">XXXXXXXXXXXX</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="label">Routing number:</div>
+                        <div class="value editable" contenteditable="false" id="bank-routing-number">XXXXXXXXX</div>
+                    </div>
+                    <div class="detail-item detail-item-wide">
+                        <div class="label">Address:</div>
+                        <div class="value editable" contenteditable="false" id="bank-address-full">123 Bank Street, City, State ZIP</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="invoice-footer">
+            <div class="footer-line"></div>
+            <div class="page-count" id="page-count">1/1</div>
+        </footer>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="config.js"></script>
+    <script src="invoice.js"></script>
+</body>
+</html>
