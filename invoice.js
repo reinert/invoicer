@@ -39,16 +39,71 @@ function setDueDateVisibility(isVisible) {
     }
 }
 
-function getInvoiceNumber(date) {
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = String(date.getFullYear()).slice(-2);
-    return `${month}${year}`;
+/**
+ * Invoice date = date when the LAST invoiced service is performed (per contract).
+ * Same period logic as invoice number: 1–5 → prev month 16th–last; 6–20 → current 1st–15th; 21–31 → current 16th–last.
+ * @param {Date} issueDate - Date the invoice is issued (e.g. today)
+ */
+function getInvoiceDateFromIssueDate(issueDate) {
+    const day = issueDate.getDate();
+    const y = issueDate.getFullYear();
+    const m = issueDate.getMonth();
+    if (day >= 1 && day <= 5) {
+        return getLastDayOfMonth(new Date(y, m - 1, 1));
+    }
+    if (day >= 6 && day <= 20) {
+        return new Date(y, m, 15);
+    }
+    return getLastDayOfMonth(new Date(y, m, 1));
 }
 
+/**
+ * Invoice number by contract: YYMM-N
+ * - By 20th of month: invoice for 1st–15th of that month → -1
+ * - By 5th of next month: invoice for 16th–last day of previous month → -2
+ * @param {Date} issueDate - Date the invoice is issued (e.g. today)
+ */
+function getInvoiceNumber(issueDate) {
+    const day = issueDate.getDate();
+    let month, year;
+    if (day >= 1 && day <= 5) {
+        // Issued 1st–5th: previous month's second period (16th–last day of prev month)
+        const prev = new Date(issueDate.getFullYear(), issueDate.getMonth() - 1, 1);
+        month = String(prev.getMonth() + 1).padStart(2, '0');
+        year = String(prev.getFullYear()).slice(-2);
+        return `${month}${year}-2`;
+    }
+    if (day >= 6 && day <= 20) {
+        // Issued 6th–20th: current month's first period (1st–15th)
+        month = String(issueDate.getMonth() + 1).padStart(2, '0');
+        year = String(issueDate.getFullYear()).slice(-2);
+        return `${month}${year}-1`;
+    }
+    // Issued 21st–end of month: current month's second period (16th–last day)
+    month = String(issueDate.getMonth() + 1).padStart(2, '0');
+    year = String(issueDate.getFullYear()).slice(-2);
+    return `${month}${year}-2`;
+}
+
+/**
+ * Service period from invoice date (invoice date = last day of services invoiced).
+ * If invoice date is 15th → period 1st–15th; otherwise → period 16th through invoice date.
+ */
 function getServicePeriodDates(date) {
-    const startDate = new Date(date.getFullYear(), date.getMonth(), 1);
-    const endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-    return { startDate, endDate };
+    const y = date.getFullYear();
+    const m = date.getMonth();
+    const day = date.getDate();
+    const lastDay = getLastDayOfMonth(date).getDate();
+    if (day === 15) {
+        return {
+            startDate: new Date(y, m, 1),
+            endDate: new Date(y, m, 15)
+        };
+    }
+    return {
+        startDate: new Date(y, m, 16),
+        endDate: new Date(y, m, day)
+    };
 }
 
 function getServicePeriod(date) {
@@ -76,15 +131,14 @@ function getLastDayOfMonth(date) {
 }
 
 function updateInvoiceDateDependentFields(invoiceDate) {
-    const normalizedInvoiceDate = getLastDayOfMonth(invoiceDate);
-    document.getElementById('invoice-date').textContent = formatDate(normalizedInvoiceDate);
+    document.getElementById('invoice-date').textContent = formatDate(invoiceDate);
 
-    const dueDate = new Date(normalizedInvoiceDate);
+    const dueDate = new Date(invoiceDate);
     dueDate.setDate(dueDate.getDate() + (CONFIG.paymentTerms || 30));
     document.getElementById('due-date').textContent = formatDate(dueDate);
 
     const servicePeriod = CONFIG.servicePeriod === 'auto'
-        ? getServicePeriod(normalizedInvoiceDate)
+        ? getServicePeriod(invoiceDate)
         : CONFIG.servicePeriod;
     document.querySelectorAll('.service-period-range').forEach(el => {
         el.textContent = servicePeriod;
@@ -168,9 +222,7 @@ function calculateTotal() {
 
 function initializeDefaults() {
     const today = new Date();
-    const baseDate = new Date(today);
-    baseDate.setDate(baseDate.getDate() - 10);
-    const invoiceDate = getLastDayOfMonth(baseDate);
+    const invoiceDate = getInvoiceDateFromIssueDate(today);
 
     // Company info
     document.getElementById('company-name').textContent = CONFIG.company.name;
@@ -186,22 +238,14 @@ function initializeDefaults() {
     document.getElementById('bill-to-city').textContent = CONFIG.client.address.line2;
     document.getElementById('bill-to-country').textContent = CONFIG.client.address.country;
 
-    // Invoice number
+    // Invoice number (based on issue date = today, per contract periods)
     const invoiceNumber = CONFIG.invoiceNumber === 'auto' 
-        ? getInvoiceNumber(invoiceDate) 
+        ? getInvoiceNumber(today) 
         : CONFIG.invoiceNumber;
     document.getElementById('invoice-number').textContent = invoiceNumber;
 
-    // Dates
+    // Dates (invoice date = last day of services; service period derived from it)
     updateInvoiceDateDependentFields(invoiceDate);
-    
-    // Service period
-    const servicePeriod = CONFIG.servicePeriod === 'auto'
-        ? getServicePeriod(invoiceDate)
-        : CONFIG.servicePeriod;
-    document.querySelectorAll('.service-period-range').forEach(el => {
-        el.textContent = servicePeriod;
-    });
 
     // Banking info
     document.getElementById('bank-legal-name').textContent = CONFIG.banking.legalName;
