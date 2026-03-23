@@ -41,15 +41,21 @@ function setDueDateVisibility(isVisible) {
 
 /**
  * Invoice date = date when the LAST invoiced service is performed (per contract).
- * Same period logic as invoice number: 1–5 → prev month 16th–last; 6–20 → current 1st–15th; 21–31 → current 16th–last.
+ * Issued 1st–5th: last day of previous month (both half and full month).
+ * Full month issued 6th onward: last day of current month.
+ * Half-month: 6–20 → 15th of current month; 21–31 → last day of current month.
  * @param {Date} issueDate - Date the invoice is issued (e.g. today)
+ * @param {boolean} isFullMonth - If true, use full-month rules
  */
-function getInvoiceDateFromIssueDate(issueDate) {
-    const day = issueDate.getDate();
+function getInvoiceDateFromIssueDate(issueDate, isFullMonth) {
     const y = issueDate.getFullYear();
     const m = issueDate.getMonth();
+    const day = issueDate.getDate();
     if (day >= 1 && day <= 5) {
         return getLastDayOfMonth(new Date(y, m - 1, 1));
+    }
+    if (isFullMonth) {
+        return getLastDayOfMonth(new Date(y, m, 1));
     }
     if (day >= 6 && day <= 20) {
         return new Date(y, m, 15);
@@ -58,42 +64,48 @@ function getInvoiceDateFromIssueDate(issueDate) {
 }
 
 /**
- * Invoice number by contract: YYMM-N
- * - By 20th of month: invoice for 1st–15th of that month → -1
- * - By 5th of next month: invoice for 16th–last day of previous month → -2
+ * Invoice number: YYMM (full month) or YYMM-N (half-month).
+ * Issued 1st–5th: previous month (full = MMYY, half = MMYY-2).
+ * Full month issued 6th onward: current month MMYY.
+ * Half-month: -1 for 6th–20th (1st–15th), -2 for 21st–end (16th–last).
  * @param {Date} issueDate - Date the invoice is issued (e.g. today)
+ * @param {boolean} isFullMonth - If true, return MMYY only (no -1/-2)
  */
-function getInvoiceNumber(issueDate) {
+function getInvoiceNumber(issueDate, isFullMonth) {
     const day = issueDate.getDate();
-    let month, year;
+    const month = String(issueDate.getMonth() + 1).padStart(2, '0');
+    const year = String(issueDate.getFullYear()).slice(-2);
     if (day >= 1 && day <= 5) {
-        // Issued 1st–5th: previous month's second period (16th–last day of prev month)
         const prev = new Date(issueDate.getFullYear(), issueDate.getMonth() - 1, 1);
-        month = String(prev.getMonth() + 1).padStart(2, '0');
-        year = String(prev.getFullYear()).slice(-2);
-        return `${month}${year}-2`;
+        const prevMonth = String(prev.getMonth() + 1).padStart(2, '0');
+        const prevYear = String(prev.getFullYear()).slice(-2);
+        return isFullMonth ? `${prevMonth}${prevYear}` : `${prevMonth}${prevYear}-2`;
+    }
+    if (isFullMonth) {
+        return `${month}${year}`;
     }
     if (day >= 6 && day <= 20) {
-        // Issued 6th–20th: current month's first period (1st–15th)
-        month = String(issueDate.getMonth() + 1).padStart(2, '0');
-        year = String(issueDate.getFullYear()).slice(-2);
         return `${month}${year}-1`;
     }
-    // Issued 21st–end of month: current month's second period (16th–last day)
-    month = String(issueDate.getMonth() + 1).padStart(2, '0');
-    year = String(issueDate.getFullYear()).slice(-2);
     return `${month}${year}-2`;
 }
 
 /**
  * Service period from invoice date (invoice date = last day of services invoiced).
- * If invoice date is 15th → period 1st–15th; otherwise → period 16th through invoice date.
+ * Half-month: if 15th → 1st–15th; else → 16th through invoice date.
+ * Full month: 1st through last day of that month.
+ * @param {boolean} isFullMonth - If true, period is full month
  */
-function getServicePeriodDates(date) {
+function getServicePeriodDates(date, isFullMonth) {
     const y = date.getFullYear();
     const m = date.getMonth();
+    if (isFullMonth) {
+        return {
+            startDate: new Date(y, m, 1),
+            endDate: getLastDayOfMonth(date)
+        };
+    }
     const day = date.getDate();
-    const lastDay = getLastDayOfMonth(date).getDate();
     if (day === 15) {
         return {
             startDate: new Date(y, m, 1),
@@ -106,8 +118,8 @@ function getServicePeriodDates(date) {
     };
 }
 
-function getServicePeriod(date) {
-    const { startDate, endDate } = getServicePeriodDates(date);
+function getServicePeriod(date, isFullMonth) {
+    const { startDate, endDate } = getServicePeriodDates(date, isFullMonth);
     return `From ${formatLongDate(startDate)} through ${formatLongDate(endDate)}`;
 }
 
@@ -130,7 +142,50 @@ function getLastDayOfMonth(date) {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0);
 }
 
-function updateInvoiceDateDependentFields(invoiceDate) {
+/** True if "Full month" radio is selected, false for "Half-month". */
+function getInvoicePeriodMode() {
+    const full = document.querySelector('input[name="invoice-period"][value="full-month"]');
+    return full ? full.checked : false;
+}
+
+/**
+ * Default line amount: CONFIG.defaultItem.amount is the monthly amount.
+ * Full month → monthly amount; half-month → monthly/2 rounded to 2 decimals (e.g. 0.555 → 0.56).
+ */
+function getDefaultAmountForPeriod(isFullMonth) {
+    const monthly = CONFIG.defaultItem.amount;
+    if (isFullMonth) {
+        return monthly;
+    }
+    return Math.round((monthly / 2) * 100) / 100;
+}
+
+/**
+ * Recompute invoice number, invoice date, due date and service period from today and period mode.
+ * Call when period type (half/full) changes or on init.
+ */
+function refreshPeriodDependentFields() {
+    const today = new Date();
+    const isFullMonth = getInvoicePeriodMode();
+    const invoiceDate = getInvoiceDateFromIssueDate(today, isFullMonth);
+    if (CONFIG.invoiceNumber === 'auto') {
+        document.getElementById('invoice-number').textContent = getInvoiceNumber(today, isFullMonth);
+    }
+    updateInvoiceDateDependentFields(invoiceDate, isFullMonth);
+    // Update default (first) line item amount to match period
+    const firstItem = document.querySelector('[data-item]');
+    if (firstItem) {
+        const amountEl = firstItem.querySelector('[data-amount]');
+        if (amountEl) {
+            amountEl.textContent = formatAmountValue(getDefaultAmountForPeriod(isFullMonth));
+            calculateTotal();
+        }
+    }
+    const invoiceNumber = document.getElementById('invoice-number').textContent;
+    document.title = `Invoice #${invoiceNumber} - ${CONFIG.company.name}`;
+}
+
+function updateInvoiceDateDependentFields(invoiceDate, isFullMonth) {
     document.getElementById('invoice-date').textContent = formatDate(invoiceDate);
 
     const dueDate = new Date(invoiceDate);
@@ -138,7 +193,7 @@ function updateInvoiceDateDependentFields(invoiceDate) {
     document.getElementById('due-date').textContent = formatDate(dueDate);
 
     const servicePeriod = CONFIG.servicePeriod === 'auto'
-        ? getServicePeriod(invoiceDate)
+        ? getServicePeriod(invoiceDate, isFullMonth)
         : CONFIG.servicePeriod;
     document.querySelectorAll('.service-period-range').forEach(el => {
         el.textContent = servicePeriod;
@@ -222,7 +277,8 @@ function calculateTotal() {
 
 function initializeDefaults() {
     const today = new Date();
-    const invoiceDate = getInvoiceDateFromIssueDate(today);
+    const isFullMonth = getInvoicePeriodMode();
+    const invoiceDate = getInvoiceDateFromIssueDate(today, isFullMonth);
 
     // Company info
     document.getElementById('company-name').textContent = CONFIG.company.name;
@@ -238,14 +294,12 @@ function initializeDefaults() {
     document.getElementById('bill-to-city').textContent = CONFIG.client.address.line2;
     document.getElementById('bill-to-country').textContent = CONFIG.client.address.country;
 
-    // Invoice number (based on issue date = today, per contract periods)
-    const invoiceNumber = CONFIG.invoiceNumber === 'auto' 
-        ? getInvoiceNumber(today) 
+    // Invoice number and dates (from today + period type: half-month or full month)
+    const invoiceNumber = CONFIG.invoiceNumber === 'auto'
+        ? getInvoiceNumber(today, isFullMonth)
         : CONFIG.invoiceNumber;
     document.getElementById('invoice-number').textContent = invoiceNumber;
-
-    // Dates (invoice date = last day of services; service period derived from it)
-    updateInvoiceDateDependentFields(invoiceDate);
+    updateInvoiceDateDependentFields(invoiceDate, isFullMonth);
 
     // Banking info
     document.getElementById('bank-legal-name').textContent = CONFIG.banking.legalName;
@@ -255,7 +309,7 @@ function initializeDefaults() {
     document.getElementById('bank-routing-number').textContent = CONFIG.banking.routingNumber;
     document.getElementById('bank-address-full').textContent = `${CONFIG.banking.address.line1}, ${CONFIG.banking.address.line2}`;
 
-    // Default item
+    // Default item (amount = monthly or half, depending on period)
     const firstItem = document.querySelector('[data-item]');
     if (firstItem) {
         const titleEl = firstItem.querySelector('h3');
@@ -264,7 +318,7 @@ function initializeDefaults() {
         
         if (titleEl) titleEl.textContent = CONFIG.defaultItem.title;
         if (descEl) descEl.textContent = CONFIG.defaultItem.description;
-        if (amountEl) amountEl.textContent = formatAmountValue(CONFIG.defaultItem.amount);
+        if (amountEl) amountEl.textContent = formatAmountValue(getDefaultAmountForPeriod(isFullMonth));
     }
 
     // Currency selector
@@ -314,6 +368,10 @@ function downloadPDF() {
     const invoiceNumber = document.getElementById('invoice-number').textContent;
     const filename = `invoice-${invoiceNumber}.pdf`;
     
+    // Prevent html2canvas from clipping borders (overflow: hidden cuts off edges)
+    const originalOverflow = invoiceContainer.style.overflow;
+    invoiceContainer.style.overflow = 'visible';
+    
     const options = {
         margin: [10, 10, 10, 10],
         filename: filename,
@@ -321,7 +379,9 @@ function downloadPDF() {
         html2canvas: { 
             scale: 2,
             useCORS: true,
-            letterRendering: true
+            letterRendering: true,
+            scrollX: 0,
+            scrollY: 0
         },
         jsPDF: { 
             unit: 'mm', 
@@ -336,6 +396,17 @@ function downloadPDF() {
         pageCountEl.textContent = '';
     }
 
+    function cleanup() {
+        invoiceContainer.style.overflow = originalOverflow;
+        document.body.classList.remove('pdf-export');
+        if (wasEditMode) {
+            toggleEditMode();
+        }
+        if (pageCountEl) {
+            pageCountEl.textContent = '1/1';
+        }
+    }
+
     html2pdf().set(options).from(invoiceContainer).toPdf().get('pdf').then(pdf => {
         const totalPages = pdf.internal.getNumberOfPages();
         for (let pageIndex = 1; pageIndex <= totalPages; pageIndex += 1) {
@@ -347,17 +418,8 @@ function downloadPDF() {
             const pageHeight = pdf.internal.pageSize.getHeight();
             pdf.text(pageText, pageWidth - 14, pageHeight - 8, { align: 'right' });
         }
-    }).save().then(() => {
-        // Remove PDF export styles
-        document.body.classList.remove('pdf-export');
-        
-        // Restore edit mode if it was active
-        if (wasEditMode) {
-            toggleEditMode();
-        }
-        if (pageCountEl) {
-            pageCountEl.textContent = '1/1';
-        }
+    }).save().then(cleanup).catch(function() {
+        cleanup();
     });
 }
 
@@ -366,10 +428,11 @@ function addItem() {
     const invoiceDateField = document.getElementById('invoice-date');
     const parsedInvoiceDate = invoiceDateField ? parseInvoiceDate(invoiceDateField.textContent) : null;
     const baseDate = parsedInvoiceDate || new Date();
+    const isFullMonth = getInvoicePeriodMode();
     const servicePeriod = CONFIG.servicePeriod === 'auto'
-        ? getServicePeriod(baseDate)
+        ? getServicePeriod(baseDate, isFullMonth)
         : CONFIG.servicePeriod;
-    const defaultAmount = formatAmountValue(0);
+    const defaultAmount = formatAmountValue(getDefaultAmountForPeriod(isFullMonth));
     const symbol = getCurrencySymbol();
     
     const newItem = document.createElement('div');
@@ -447,10 +510,14 @@ function initializeEventListeners() {
         invoiceDateField.addEventListener('blur', function() {
             const parsedDate = parseInvoiceDate(this.textContent);
             if (parsedDate) {
-                updateInvoiceDateDependentFields(parsedDate);
+                updateInvoiceDateDependentFields(parsedDate, getInvoicePeriodMode());
             }
         });
     }
+
+    document.querySelectorAll('input[name="invoice-period"]').forEach(function(radio) {
+        radio.addEventListener('change', refreshPeriodDependentFields);
+    });
 }
 
 function handleAmountKeydown(e) {

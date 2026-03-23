@@ -251,6 +251,41 @@ body {
     min-width: 180px;
 }
 
+.period-type {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.period-type-label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--color-text-muted);
+}
+
+.radio-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.radio-group .radio-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--color-text-muted);
+    cursor: pointer;
+}
+
+.radio-group .radio-label input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--color-accent);
+}
+
 .date-toggle {
     display: flex;
     justify-content: flex-end;
@@ -644,6 +679,7 @@ body.pdf-export .invoice-container {
     border-radius: 0 !important;
     border: 1px solid #000 !important;
     padding-bottom: 100px !important;
+    overflow: visible !important; /* avoid html2canvas clipping borders */
 }
 
 body.pdf-export .invoice-header {
@@ -775,6 +811,7 @@ body.pdf-export .total-amount .currency-symbol {
     color: #333 !important;
 }
 
+body.pdf-export .period-type,
 body.pdf-export .date-toggle {
     display: none !important;
 }
