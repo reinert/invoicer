@@ -1,0 +1,15 @@
+{
+  "name": "invoicer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Generate the invoice PDF from the command line",
+  "bin": {
+    "generate-invoice": "./generate-invoice.js"
+  },
+  "scripts": {
+    "generate-invoice": "node ./generate-invoice.js"
+  },
+  "dependencies": {
+    "puppeteer": "^23.0.0"
+  }
+}
