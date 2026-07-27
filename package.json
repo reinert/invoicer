@@ -10,6 +10,9 @@
     "generate-invoice": "node ./generate-invoice.js"
   },
   "dependencies": {
+    "dotenv": "^17.4.2",
+    "imapflow": "^1.5.0",
+    "nodemailer": "^9.0.3",
     "puppeteer": "^23.0.0"
   }
 }

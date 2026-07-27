@@ -1,5 +1,9 @@
 # Personal configuration (contains sensitive info)
 config.js
+.env
+
+# Generated invoice emails
+invoice-email-*.json
 
 # Generated invoices
 *.pdf
