@@ -17,6 +17,11 @@
  *   --invoice-number <text>   Override the auto-generated invoice number
  *   --output <path>           Output PDF path (default: invoice-<number>.pdf in the cwd)
  *   -h, --help                Show this help
+ *
+ * Also usable as a module:
+ *   const { generateInvoice } = require('./generate-invoice');
+ *   const { pdfPath, invoiceNumber, invoiceDate, dueDate, periodLabel } =
+ *       await generateInvoice({ title, description, amount, billingPeriod, period, invoiceNumber, output });
  */
 
 const { parseArgs } = require('node:util');
@@ -52,6 +57,25 @@ Options:
     process.exit(code);
 }
 
+function normalizeBillingPeriod(value) {
+    const billingPeriod = BILLING_PERIOD_MAP[value];
+    if (!billingPeriod) {
+        throw new Error(`--billing-period must be "half" or "full", got "${value}"`);
+    }
+    return billingPeriod;
+}
+
+function normalizeAmount(value) {
+    if (value === undefined) {
+        return undefined;
+    }
+    const amount = Number(value);
+    if (!Number.isFinite(amount)) {
+        throw new Error(`--amount must be a number, got "${value}"`);
+    }
+    return amount;
+}
+
 function parseCliArgs(argv) {
     let values;
     try {
@@ -77,19 +101,14 @@ function parseCliArgs(argv) {
         printHelpAndExit(0);
     }
 
-    const billingPeriod = BILLING_PERIOD_MAP[values['billing-period']];
-    if (!billingPeriod) {
-        console.error(`Error: --billing-period must be "half" or "full", got "${values['billing-period']}"`);
-        printHelpAndExit(1);
-    }
-
+    let billingPeriod;
     let amount;
-    if (values.amount !== undefined) {
-        amount = Number(values.amount);
-        if (!Number.isFinite(amount)) {
-            console.error(`Error: --amount must be a number, got "${values.amount}"`);
-            printHelpAndExit(1);
-        }
+    try {
+        billingPeriod = normalizeBillingPeriod(values['billing-period']);
+        amount = normalizeAmount(values.amount);
+    } catch (err) {
+        console.error(`Error: ${err.message}`);
+        printHelpAndExit(1);
     }
 
     return {
@@ -129,9 +148,12 @@ async function waitForDownload(downloadDir, timeoutMs = 60000) {
     throw new Error('Timed out waiting for the PDF download to complete');
 }
 
-async function main() {
-    const opts = parseCliArgs(process.argv.slice(2));
-
+/**
+ * Render invoice.html headlessly with the given overrides, download the PDF,
+ * and return the resulting file path plus the invoice metadata that ended up
+ * on the page (useful for anything downstream, e.g. an email JSON).
+ */
+async function generateInvoice(opts = {}) {
     const downloadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'invoicer-pdf-'));
     const browser = await puppeteer.launch({ headless: true });
 
@@ -190,9 +212,11 @@ async function main() {
             calculateTotal();
         }, opts);
 
-        const invoiceNumber = await page.evaluate(
-            () => document.getElementById('invoice-number').textContent
-        );
+        const { invoiceNumber, invoiceDate, dueDate } = await page.evaluate(() => ({
+            invoiceNumber: document.getElementById('invoice-number').textContent,
+            invoiceDate: document.getElementById('invoice-date').textContent,
+            dueDate: document.getElementById('due-date').textContent
+        }));
 
         await page.evaluate(() => downloadPDF());
         await waitForDownload(downloadDir);
@@ -203,20 +227,34 @@ async function main() {
         }
         const downloadedPath = path.join(downloadDir, downloadedFiles[0]);
 
-        const outputPath = path.resolve(
+        const pdfPath = path.resolve(
             process.cwd(),
             opts.output || `invoice-${invoiceNumber}.pdf`
         );
-        fs.copyFileSync(downloadedPath, outputPath);
+        fs.copyFileSync(downloadedPath, pdfPath);
 
-        console.log(`Invoice PDF written to ${outputPath}`);
+        // invoiceDate is MM/DD/YYYY; the period label is that month's "YYYY-MM".
+        const [invoiceMonth, , invoiceYear] = invoiceDate.split('/');
+        const periodLabel = `${invoiceYear}-${invoiceMonth}`;
+
+        return { pdfPath, invoiceNumber, invoiceDate, dueDate, periodLabel };
     } finally {
         await browser.close();
         fs.rmSync(downloadDir, { recursive: true, force: true });
     }
 }
 
-main().catch((err) => {
-    console.error(err.stack || err.message);
-    process.exit(1);
-});
+async function main() {
+    const opts = parseCliArgs(process.argv.slice(2));
+    const { pdfPath } = await generateInvoice(opts);
+    console.log(`Invoice PDF written to ${pdfPath}`);
+}
+
+if (require.main === module) {
+    main().catch((err) => {
+        console.error(err.stack || err.message);
+        process.exit(1);
+    });
+}
+
+module.exports = { generateInvoice };

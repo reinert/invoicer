@@ -65,8 +65,8 @@ const CONFIG = {
     currency: 'USD',
 
     // Invoice number format
-    // 'auto' = MMYY based on current date (e.g., '0126' for January 2026)
-    // Or set a specific value like '0525-1'
+    // 'auto' = YYMM based on current date (e.g., '2601' for January 2026)
+    // Or set a specific value like '2505-1'
     invoiceNumber: 'auto',
 
     // Days until due date (from invoice date)

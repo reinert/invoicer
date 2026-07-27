@@ -32,8 +32,8 @@ const CONFIG = {
     currency: 'USD',
 
     // Invoice Number Format
-    // Set to 'auto' for MMYY format based on current date
-    // Or set a specific value like '0525'
+    // Set to 'auto' for YYMM format based on current date
+    // Or set a specific value like '2505'
     invoiceNumber: 'auto',
 
     // Payment Terms (days until due date)
@@ -64,5 +64,12 @@ const CONFIG = {
         accountType: 'Checking',
         routingNumber: 'XXXXXXXXX',
         accountNumber: 'XXXXXXXXXXXX'
+    },
+
+    // Defaults for `generate-invoice-email.js` (all overridable via CLI flags)
+    email: {
+        to: 'ap@client.com',
+        subjectInitials: 'YI',
+        senderName: 'Your Name'
     }
 };
