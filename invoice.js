@@ -79,15 +79,15 @@ function getInvoiceNumber(issueDate, isFullMonth) {
         const prev = new Date(issueDate.getFullYear(), issueDate.getMonth() - 1, 1);
         const prevMonth = String(prev.getMonth() + 1).padStart(2, '0');
         const prevYear = String(prev.getFullYear()).slice(-2);
-        return isFullMonth ? `${prevMonth}${prevYear}` : `${prevMonth}${prevYear}-2`;
+        return isFullMonth ? `${prevYear}${prevMonth}` : `${prevYear}${prevMonth}-2`;
     }
     if (isFullMonth) {
-        return `${month}${year}`;
+        return `${year}${month}`;
     }
     if (day >= 6 && day <= 20) {
-        return `${month}${year}-1`;
+        return `${year}${month}-1`;
     }
-    return `${month}${year}-2`;
+    return `${year}${month}-2`;
 }
 
 /**
@@ -442,7 +442,8 @@ function addItem() {
         <div class="item-details">
             <h3 class="editable" contenteditable="true">New Service</h3>
             <p>
-                <span class="editable period-note" contenteditable="true">Service description</span> <span class="service-period-range">${servicePeriod}</span>.
+                <span class="editable period-note" contenteditable="true">Service description</span><br>
+                <span class="editable service-period-range" contenteditable="true">${servicePeriod}</span>.
             </p>
         </div>
         <div class="item-amount">
