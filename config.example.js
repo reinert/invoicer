@@ -36,8 +36,9 @@ const CONFIG = {
     // Or set a specific value like '2505'
     invoiceNumber: 'auto',
 
-    // Payment Terms (days until due date)
-    paymentTerms: 30,
+    // Payment Terms (days added to the due date, on top of the last day of
+    // the billing cycle). 0 = due on the last day of the billing cycle.
+    paymentTerms: 0,
 
     // Default Service Item
     defaultItem: {

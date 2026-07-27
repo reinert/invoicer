@@ -69,8 +69,9 @@ const CONFIG = {
     // Or set a specific value like '2505-1'
     invoiceNumber: 'auto',
 
-    // Days until due date (from invoice date)
-    paymentTerms: 30,
+    // Days added to the due date, on top of the last day of the billing
+    // cycle. 0 = due on the last day of the billing cycle.
+    paymentTerms: 0,
 
     // Default service item
     defaultItem: {
@@ -124,7 +125,7 @@ Select a currency from the dropdown. All amounts will be reformatted with the ap
 
 ### Due Date
 
-Toggle **Include Due Date** to show or hide the due date field. The due date is calculated based on the `paymentTerms` setting.
+Toggle **Include Due Date** to show or hide the due date field. The due date defaults to the last day of the billing cycle, plus the `paymentTerms` setting (in days) if you want extra time beyond that.
 
 ### Download PDF
 

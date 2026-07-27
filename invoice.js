@@ -189,7 +189,7 @@ function updateInvoiceDateDependentFields(invoiceDate, isFullMonth) {
     document.getElementById('invoice-date').textContent = formatDate(invoiceDate);
 
     const dueDate = new Date(invoiceDate);
-    dueDate.setDate(dueDate.getDate() + (CONFIG.paymentTerms || 30));
+    dueDate.setDate(dueDate.getDate() + (CONFIG.paymentTerms ?? 0));
     document.getElementById('due-date').textContent = formatDate(dueDate);
 
     const servicePeriod = CONFIG.servicePeriod === 'auto'
