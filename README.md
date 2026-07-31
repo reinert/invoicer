@@ -101,7 +101,10 @@ const CONFIG = {
         bankName: 'Bank Name',
         accountType: 'Checking',
         routingNumber: 'XXXXXXXXX',
-        accountNumber: 'XXXXXXXXXXXX'
+        accountNumber: 'XXXXXXXXXXXX',
+        // Optional reference the payer should include with the transfer
+        // (e.g. 'FFC123456'). Leave empty to hide the field on the invoice.
+        additionalMessage: ''
     },
 
     // Defaults for generate-invoice-email.js (all overridable via CLI flags)
@@ -231,6 +234,7 @@ invoicer/
 
 - **Invoice Date**: Edit the invoice date and other date-dependent fields (due date, service period) will update automatically
 - **Amount Formatting**: Enter amounts in any format (1000, 1,000, 1.000,00) — they'll be auto-formatted based on the selected currency
+- **Additional Message**: Set `banking.additionalMessage` for a payment reference the payer must include with the transfer. The field is hidden on the invoice while empty, and always shown in edit mode so you can fill it in per invoice
 - **Service Period**: Set `servicePeriod: 'auto'` to automatically use the current month, or specify a custom period like `'Q1 2026'` or `'January - March 2026'`
 
 ## Privacy

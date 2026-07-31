@@ -40,6 +40,20 @@ function setDueDateVisibility(isVisible) {
 }
 
 /**
+ * The payment "Additional Message" is optional: it stays hidden while empty,
+ * but is always shown in edit mode so it can be filled in.
+ */
+function refreshAdditionalMessageVisibility() {
+    const item = document.getElementById('bank-additional-message-item');
+    const value = document.getElementById('bank-additional-message');
+    if (!item || !value) {
+        return;
+    }
+    const hasMessage = value.textContent.trim() !== '';
+    item.style.display = (hasMessage || editMode) ? '' : 'none';
+}
+
+/**
  * Invoice date = date when the LAST invoiced service is performed (per contract).
  * Issued 1st–5th: last day of previous month (both half and full month).
  * Full month issued 6th onward: last day of current month.
@@ -308,6 +322,8 @@ function initializeDefaults() {
     document.getElementById('bank-account-number').textContent = CONFIG.banking.accountNumber;
     document.getElementById('bank-routing-number').textContent = CONFIG.banking.routingNumber;
     document.getElementById('bank-address-full').textContent = `${CONFIG.banking.address.line1}, ${CONFIG.banking.address.line2}`;
+    document.getElementById('bank-additional-message').textContent = CONFIG.banking.additionalMessage || '';
+    refreshAdditionalMessageVisibility();
 
     // Default item (amount = monthly or half, depending on period)
     const firstItem = document.querySelector('[data-item]');
@@ -348,6 +364,8 @@ function toggleEditMode() {
     editables.forEach(el => {
         el.contentEditable = editMode ? 'true' : 'false';
     });
+
+    refreshAdditionalMessageVisibility();
 
     const toggleBtn = document.querySelector('.edit-mode-toggle');
     toggleBtn.classList.toggle('active', editMode);

@@ -64,7 +64,10 @@ const CONFIG = {
         bankName: 'Bank Name',
         accountType: 'Checking',
         routingNumber: 'XXXXXXXXX',
-        accountNumber: 'XXXXXXXXXXXX'
+        accountNumber: 'XXXXXXXXXXXX',
+        // Optional reference the payer should include with the transfer
+        // (e.g. 'FFC123456'). Leave empty to hide the field on the invoice.
+        additionalMessage: ''
     },
 
     // Defaults for `generate-invoice-email.js` (all overridable via CLI flags)
