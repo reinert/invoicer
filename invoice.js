@@ -378,6 +378,50 @@ const PDF_MARGIN_MM = 10;
 const PDF_PAGE_HEIGHT_MM = 297;
 const PDF_CONTENT_HEIGHT_MM = PDF_PAGE_HEIGHT_MM - 2 * PDF_MARGIN_MM;
 
+// Extra height captured below the invoice. html2canvas re-lays the invoice out
+// in its own document clone, where the web fonts can resolve differently and
+// the content comes out a few dozen pixels taller than the live DOM. The
+// capture window is sized from the live DOM, so without this slack the overflow
+// — the container's bottom border included — is simply cut off, leaving the
+// side borders running off the edge of an open-bottomed box.
+const PDF_CAPTURE_SLACK_PX = 160;
+
+/**
+ * Cut the slack back off: crop the canvas to its last row containing ink, which
+ * is the container's bottom border. Leaves the invoice as a closed rectangle
+ * with no white margin below it, whatever height the clone happened to render.
+ */
+function trimCanvasToContent(canvas) {
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+    let lastInkedRow = -1;
+    for (let y = canvas.height - 1; y >= 0 && lastInkedRow === -1; y--) {
+        for (let x = 0; x < canvas.width; x++) {
+            const i = (y * canvas.width + x) * 4;
+            const isBlank = data[i + 3] < 8 || (data[i] > 250 && data[i + 1] > 250 && data[i + 2] > 250);
+            if (!isBlank) {
+                lastInkedRow = y;
+                break;
+            }
+        }
+    }
+
+    if (lastInkedRow === -1 || lastInkedRow >= canvas.height - 1) {
+        return canvas;
+    }
+
+    const trimmed = document.createElement('canvas');
+    trimmed.width = canvas.width;
+    trimmed.height = lastInkedRow + 1;
+
+    const trimmedCtx = trimmed.getContext('2d');
+    trimmedCtx.fillStyle = 'white';
+    trimmedCtx.fillRect(0, 0, trimmed.width, trimmed.height);
+    trimmedCtx.drawImage(canvas, 0, 0);
+    return trimmed;
+}
+
 /**
  * html2pdf slices the rendered canvas into page-height chunks, so a canvas even
  * a few pixels too tall spills a sliver onto a second page. Scale the whole
@@ -429,12 +473,13 @@ function downloadPDF() {
         margin: [PDF_MARGIN_MM, PDF_MARGIN_MM, PDF_MARGIN_MM, PDF_MARGIN_MM],
         filename: filename,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { 
+        html2canvas: {
             scale: 2,
             useCORS: true,
             letterRendering: true,
             scrollX: 0,
-            scrollY: 0
+            scrollY: 0,
+            height: Math.ceil(invoiceContainer.getBoundingClientRect().height) + PDF_CAPTURE_SLACK_PX
         },
         jsPDF: { 
             unit: 'mm', 
@@ -447,11 +492,6 @@ function downloadPDF() {
         pagebreak: { mode: [] }
     };
     
-    const pageCountEl = document.getElementById('page-count');
-    if (pageCountEl) {
-        pageCountEl.textContent = '';
-    }
-
     function cleanup() {
         invoiceContainer.style.overflow = originalOverflow;
         invoiceContainer.style.minHeight = originalMinHeight;
@@ -459,24 +499,12 @@ function downloadPDF() {
         if (wasEditMode) {
             toggleEditMode();
         }
-        if (pageCountEl) {
-            pageCountEl.textContent = '1/1';
-        }
     }
 
+    // The invoice is always a single page, so it carries no page number.
     html2pdf().set(options).from(invoiceContainer).toCanvas().then(function () {
-        this.prop.canvas = fitCanvasToOnePage(this.prop.canvas, this.prop.pageSize.inner.ratio);
-    }).toPdf().get('pdf').then(pdf => {
-        const totalPages = pdf.internal.getNumberOfPages();
-        for (let pageIndex = 1; pageIndex <= totalPages; pageIndex += 1) {
-            pdf.setPage(pageIndex);
-            pdf.setFont('times', 'normal');
-            pdf.setFontSize(9);
-            const pageText = `${pageIndex}/${totalPages}`;
-            const pageWidth = pdf.internal.pageSize.getWidth();
-            const pageHeight = pdf.internal.pageSize.getHeight();
-            pdf.text(pageText, pageWidth - 14, pageHeight - 8, { align: 'right' });
-        }
+        const trimmed = trimCanvasToContent(this.prop.canvas);
+        this.prop.canvas = fitCanvasToOnePage(trimmed, this.prop.pageSize.inner.ratio);
     }).save().then(cleanup).catch(function() {
         cleanup();
     });

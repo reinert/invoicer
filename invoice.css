@@ -686,8 +686,12 @@ body.pdf-export .invoice-container {
     flex-direction: column !important;
 }
 
+/* Grow to fill the page, but never shrink: html2canvas re-lays the invoice out
+   a hair wider than the live DOM, and a shrinking body would push the footer
+   past the pinned page height, where the capture clips it off. Growing the
+   container instead lets fitCanvasToOnePage() scale it down intact. */
 body.pdf-export .invoice-body {
-    flex: 1 1 auto !important;
+    flex: 1 0 auto !important;
 }
 
 body.pdf-export .invoice-header {
@@ -708,10 +712,11 @@ body.pdf-export .dates-grid {
     gap: 16px !important;
 }
 
+/* The footer's rule and accent dash would sit just above the container border,
+   reading as a second bottom border. The container border closes the invoice on
+   its own. */
 body.pdf-export .invoice-footer {
-    background: white !important;
-    border-top: 1px solid #000 !important;
-    padding: 16px 28px !important;
+    display: none !important;
 }
 
 body.pdf-export .company-info h1 {
@@ -843,15 +848,6 @@ body.pdf-export .detail-item .label {
 body.pdf-export .detail-item .value {
     color: #000 !important;
     font-size: 0.85rem !important;
-}
-
-body.pdf-export .invoice-footer {
-    background: white !important;
-    border-top: 1px solid #000 !important;
-}
-
-body.pdf-export .footer-line {
-    background: #000 !important;
 }
 
 body.pdf-export .remove-item-btn,
