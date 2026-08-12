@@ -19,6 +19,8 @@
  *   --amount <number>         Line item amount
  *   --billing-period <value>  "half" or "full" (default: half)
  *   --period <text>           Override the auto-computed service period line
+ *   --invoice-date <date>     Override the invoice date (MM/DD/YYYY); the due date and
+ *                             service period are recomputed from it
  *   --invoice-number <text>   Override the auto-generated invoice number
  *   --pdf-output <path>       Where to save the generated PDF
  *
@@ -30,7 +32,9 @@
  *   --body <template>           Body template (default: the standard invoice email body)
  *   --subject-initials <text>   Value for {subjectInitials} (default: config's email.subjectInitials)
  *   --sender-name <text>        Value for {senderName} (default: config's email.senderName)
- *   --due-date <MM/DD/YYYY>     Value for {dueDate} (default: the invoice's due date)
+ *   --due-date <MM/DD/YYYY>     Value for {dueDate} (default: the invoice's due date).
+ *                               Also sets the due date on the generated invoice and
+ *                               shows it, so the PDF and the email agree.
  *   --output <path>             Where to write the email JSON (default: invoice-email-<number>.json)
  *   --stdout                    Print the JSON to stdout instead of writing a file
  *   -h, --help                  Show this help
@@ -81,6 +85,8 @@ Invoice generation (ignored if --pdf is given):
   --amount <number>           Line item amount
   --billing-period <value>    "half" or "full" (default: half)
   --period <text>             Override the auto-computed service period line
+  --invoice-date <date>       Override the invoice date (MM/DD/YYYY); the due date
+                              and service period are recomputed from it
   --invoice-number <text>     Override the auto-generated invoice number
   --pdf-output <path>         Where to save the generated PDF
 
@@ -92,7 +98,8 @@ Email fields:
   --body <template>            default: the standard invoice email body
   --subject-initials <text>    Value for {subjectInitials}
   --sender-name <text>         Value for {senderName}
-  --due-date <MM/DD/YYYY>      Value for {dueDate}
+  --due-date <MM/DD/YYYY>      Value for {dueDate}; also sets and shows the due
+                                date on the generated invoice
   --output <path>              Where to write the JSON (default: invoice-email-<number>.json)
   --stdout                     Print the JSON to stdout instead of writing a file
   -h, --help                   Show this help
@@ -114,6 +121,7 @@ function parseCliArgs(argv) {
                 amount: { type: 'string' },
                 'billing-period': { type: 'string', default: 'half' },
                 period: { type: 'string' },
+                'invoice-date': { type: 'string' },
                 'invoice-number': { type: 'string' },
                 'pdf-output': { type: 'string' },
                 pdf: { type: 'string' },
@@ -182,6 +190,8 @@ async function main() {
             amount: args.amount !== undefined ? Number(args.amount) : undefined,
             billingPeriod: args['billing-period'] === 'full' ? 'full-month' : 'half-month',
             period: args.period,
+            invoiceDate: args['invoice-date'],
+            dueDate: args['due-date'],
             invoiceNumber: args['invoice-number'],
             output: args['pdf-output']
         });

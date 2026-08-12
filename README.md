@@ -166,8 +166,12 @@ node generate-invoice.js [options]
 | `--amount <number>` | Line item amount (default: computed from the billing period) |
 | `--billing-period <half\|full>` | Billing cycle (default: `half`) |
 | `--period <text>` | Override the auto-computed service period line |
+| `--invoice-date <MM/DD/YYYY>` | Override the invoice date; the due date and service period are recomputed from it |
+| `--due-date <MM/DD/YYYY>` | Override the due date **and show it on the invoice** (the row is hidden by default). Applied after `--invoice-date`, so it wins when both are given |
 | `--invoice-number <text>` | Override the auto-generated invoice number |
 | `--output <path>` | Output PDF path (default: `invoice-<number>.pdf`) |
+
+The invoice number is derived from today's date, not from `--invoice-date` — the same way editing the date in the browser leaves the number alone. Use `--invoice-number` to change it.
 
 ### Generate the email JSON
 
@@ -185,7 +189,7 @@ Generates the invoice PDF (same flags as above) and writes a JSON payload — `{
 | `--body <template>` | default: the standard invoice email body |
 | `--subject-initials <text>` | Value for `{subjectInitials}` (default: config's `email.subjectInitials`) |
 | `--sender-name <text>` | Value for `{senderName}` (default: config's `email.senderName`) |
-| `--due-date <MM/DD/YYYY>` | Value for `{dueDate}` (default: the invoice's computed due date) |
+| `--due-date <MM/DD/YYYY>` | Value for `{dueDate}` (default: the invoice's computed due date). Also sets and shows the due date on the generated PDF, so the two can't disagree |
 | `--output <path>` | Where to write the JSON (default: `invoice-email-<number>.json`) |
 | `--stdout` | Print the JSON instead of writing a file |
 
