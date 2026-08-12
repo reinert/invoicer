@@ -678,8 +678,16 @@ body.pdf-export .invoice-container {
     box-shadow: none !important;
     border-radius: 0 !important;
     border: 1px solid #000 !important;
-    padding-bottom: 100px !important;
     overflow: visible !important; /* avoid html2canvas clipping borders */
+    /* Fill exactly one page: downloadPDF() sets min-height to the printable
+       page height, and the body soaks up the slack so the footer sits at the
+       bottom instead of floating under the payment details. */
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+body.pdf-export .invoice-body {
+    flex: 1 1 auto !important;
 }
 
 body.pdf-export .invoice-header {

@@ -372,6 +372,36 @@ function toggleEditMode() {
     toggleBtn.querySelector('span').textContent = editMode ? 'Exit Edit Mode' : 'Edit Mode';
 }
 
+// A4 portrait, and the printable area left once the PDF margins are removed.
+// The invoice is laid out to fill exactly that area, so it is always one page.
+const PDF_MARGIN_MM = 10;
+const PDF_PAGE_HEIGHT_MM = 297;
+const PDF_CONTENT_HEIGHT_MM = PDF_PAGE_HEIGHT_MM - 2 * PDF_MARGIN_MM;
+
+/**
+ * html2pdf slices the rendered canvas into page-height chunks, so a canvas even
+ * a few pixels too tall spills a sliver onto a second page. Scale the whole
+ * invoice down to the page height instead — one page always beats a stray tail.
+ */
+function fitCanvasToOnePage(canvas, pageRatio) {
+    const maxHeight = Math.floor(canvas.width * pageRatio);
+    if (canvas.height <= maxHeight) {
+        return canvas;
+    }
+
+    const fitted = document.createElement('canvas');
+    fitted.width = canvas.width;
+    fitted.height = maxHeight;
+
+    const ctx = fitted.getContext('2d');
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, fitted.width, fitted.height);
+
+    const drawnWidth = Math.round(canvas.width * (maxHeight / canvas.height));
+    ctx.drawImage(canvas, Math.round((canvas.width - drawnWidth) / 2), 0, drawnWidth, maxHeight);
+    return fitted;
+}
+
 function downloadPDF() {
     // Temporarily exit edit mode for clean PDF
     const wasEditMode = editMode;
@@ -389,9 +419,14 @@ function downloadPDF() {
     // Prevent html2canvas from clipping borders (overflow: hidden cuts off edges)
     const originalOverflow = invoiceContainer.style.overflow;
     invoiceContainer.style.overflow = 'visible';
-    
+
+    // Stretch the invoice to the printable page height (1mm short, so rounding
+    // in html2canvas can never tip it over into a second page).
+    const originalMinHeight = invoiceContainer.style.minHeight;
+    invoiceContainer.style.minHeight = `${PDF_CONTENT_HEIGHT_MM - 1}mm`;
+
     const options = {
-        margin: [10, 10, 10, 10],
+        margin: [PDF_MARGIN_MM, PDF_MARGIN_MM, PDF_MARGIN_MM, PDF_MARGIN_MM],
         filename: filename,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { 
@@ -406,7 +441,10 @@ function downloadPDF() {
             format: 'a4', 
             orientation: 'portrait' 
         },
-        pagebreak: { mode: ['css', 'avoid-all'] }
+        // No page-break handling: the invoice is always a single page, and the
+        // avoid-all/css modes pad the render out to the next page boundary,
+        // which would only make fitCanvasToOnePage() shrink it needlessly.
+        pagebreak: { mode: [] }
     };
     
     const pageCountEl = document.getElementById('page-count');
@@ -416,6 +454,7 @@ function downloadPDF() {
 
     function cleanup() {
         invoiceContainer.style.overflow = originalOverflow;
+        invoiceContainer.style.minHeight = originalMinHeight;
         document.body.classList.remove('pdf-export');
         if (wasEditMode) {
             toggleEditMode();
@@ -425,7 +464,9 @@ function downloadPDF() {
         }
     }
 
-    html2pdf().set(options).from(invoiceContainer).toPdf().get('pdf').then(pdf => {
+    html2pdf().set(options).from(invoiceContainer).toCanvas().then(function () {
+        this.prop.canvas = fitCanvasToOnePage(this.prop.canvas, this.prop.pageSize.inner.ratio);
+    }).toPdf().get('pdf').then(pdf => {
         const totalPages = pdf.internal.getNumberOfPages();
         for (let pageIndex = 1; pageIndex <= totalPages; pageIndex += 1) {
             pdf.setPage(pageIndex);
