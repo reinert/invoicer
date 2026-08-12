@@ -192,6 +192,7 @@ Generates the invoice PDF (same flags as above) and writes a JSON payload — `{
 | `--due-date <MM/DD/YYYY>` | Value for `{dueDate}` (default: the invoice's computed due date). Also sets and shows the due date on the generated PDF, so the two can't disagree |
 | `--output <path>` | Where to write the JSON (default: `invoice-email-<number>.json`) |
 | `--stdout` | Print the JSON instead of writing a file |
+| `--preview` | Also print the draft in readable form (headers + body) before writing the JSON. For reading, not piping — mutually exclusive with `--stdout` |
 
 `--subject`/`--body` templates support these placeholders: `{period} {dueDate} {invoiceNumber} {senderName} {subjectInitials} {to}`.
 

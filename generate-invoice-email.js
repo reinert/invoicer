@@ -37,6 +37,9 @@
  *                               shows it, so the PDF and the email agree.
  *   --output <path>             Where to write the email JSON (default: invoice-email-<number>.json)
  *   --stdout                    Print the JSON to stdout instead of writing a file
+ *   --preview                   Also print the draft in readable form (headers + body)
+ *                               before writing the JSON file. Not machine-readable;
+ *                               mutually exclusive with --stdout.
  *   -h, --help                  Show this help
  *
  * Placeholders available in --subject/--body templates:
@@ -102,6 +105,8 @@ Email fields:
                                 date on the generated invoice
   --output <path>              Where to write the JSON (default: invoice-email-<number>.json)
   --stdout                     Print the JSON to stdout instead of writing a file
+  --preview                    Also print the draft in readable form (headers +
+                                body) before writing the JSON; not for piping
   -h, --help                   Show this help
 
 Placeholders available in --subject/--body templates:
@@ -133,6 +138,7 @@ function parseCliArgs(argv) {
                 'due-date': { type: 'string' },
                 output: { type: 'string' },
                 stdout: { type: 'boolean', default: false },
+                preview: { type: 'boolean', default: false },
                 help: { type: 'boolean', short: 'h', default: false }
             }
         }));
@@ -150,7 +156,47 @@ function parseCliArgs(argv) {
         printHelpAndExit(1);
     }
 
+    if (values.preview && values.stdout) {
+        console.error('Error: --preview and --stdout both write to stdout; pick one');
+        printHelpAndExit(1);
+    }
+
     return values;
+}
+
+function formatBytes(bytes) {
+    if (bytes < 1024) {
+        return `${bytes} B`;
+    }
+    const kb = bytes / 1024;
+    return kb < 1024 ? `${Math.round(kb)} KB` : `${(kb / 1024).toFixed(1)} MB`;
+}
+
+/**
+ * Render the payload the way the email will actually read, for eyeballing the
+ * draft before it goes out. Deliberately not machine-readable — --stdout is
+ * still the option to pipe into send-invoice-email.js.
+ *
+ * The attachment size doubles as a sanity check that the PDF really got built.
+ */
+function formatPreview(payload) {
+    const rule = '─'.repeat(74);
+    const size = fs.existsSync(payload.attachment)
+        ? formatBytes(fs.statSync(payload.attachment).size)
+        : 'FILE MISSING';
+
+    return [
+        rule,
+        `To:          ${payload.to}`,
+        `Subject:     ${payload.subject}`,
+        `Attachment:  ${path.basename(payload.attachment)} (${size})`,
+        `             ${path.dirname(payload.attachment)}`,
+        rule,
+        '',
+        payload.body,
+        '',
+        rule
+    ].join('\n');
 }
 
 function applyTemplate(template, placeholders) {
@@ -220,6 +266,10 @@ async function main() {
     if (args.stdout) {
         console.log(json);
         return;
+    }
+
+    if (args.preview) {
+        console.log(formatPreview(payload));
     }
 
     const outputPath = path.resolve(process.cwd(), args.output || `invoice-email-${invoiceNumber}.json`);
