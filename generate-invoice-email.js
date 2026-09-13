@@ -28,7 +28,7 @@
  *   --pdf <path>               Use an existing PDF instead of generating one
  *                               (requires --invoice-number and --due-date)
  *   --to <email>                Recipient (default: config's email.to)
- *   --subject <template>        Subject template (default: '{period} {subjectInitials} Invoice')
+ *   --subject <template>        Subject template (default: '{invoiceNumberFull} {subjectInitials} Invoice')
  *   --body <template>           Body template (default: the standard invoice email body)
  *   --subject-initials <text>   Value for {subjectInitials} (default: config's email.subjectInitials)
  *   --sender-name <text>        Value for {senderName} (default: config's email.senderName)
@@ -43,7 +43,7 @@
  *   -h, --help                  Show this help
  *
  * Placeholders available in --subject/--body templates:
- *   {period} {dueDate} {invoiceNumber} {senderName} {subjectInitials} {to}
+ *   {period} {dueDate} {invoiceNumber} {invoiceNumberFull} {senderName} {subjectInitials} {to}
  */
 
 const { parseArgs } = require('node:util');
@@ -64,7 +64,7 @@ function loadConfig() {
 
 const CONFIG = loadConfig();
 
-const DEFAULT_SUBJECT_TEMPLATE = '{period} {subjectInitials} Invoice';
+const DEFAULT_SUBJECT_TEMPLATE = '{invoiceNumberFull} {subjectInitials} Invoice';
 const DEFAULT_BODY_TEMPLATE = `Hi,
 
 Please find attached my invoice for this billing period due to {dueDate}.
@@ -97,7 +97,7 @@ Email fields:
   --pdf <path>                 Use an existing PDF instead of generating one
                                 (requires --invoice-number and --due-date)
   --to <email>                 Recipient (default: config's email.to)
-  --subject <template>         default: '{period} {subjectInitials} Invoice'
+  --subject <template>         default: '{invoiceNumberFull} {subjectInitials} Invoice'
   --body <template>            default: the standard invoice email body
   --subject-initials <text>    Value for {subjectInitials}
   --sender-name <text>         Value for {senderName}
@@ -110,7 +110,7 @@ Email fields:
   -h, --help                   Show this help
 
 Placeholders available in --subject/--body templates:
-  {period} {dueDate} {invoiceNumber} {senderName} {subjectInitials} {to}
+  {period} {dueDate} {invoiceNumber} {invoiceNumberFull} {senderName} {subjectInitials} {to}
 `);
     process.exit(code);
 }
@@ -248,10 +248,14 @@ async function main() {
     }
 
     const to = args.to || CONFIG.email.to;
+    // invoiceNumber is "YYMM" / "YYMM-N" (2-digit year); build a 4-digit-year
+    // variant by combining periodLabel's "YYYY-MM" with invoiceNumber's "-N" suffix.
+    const invoiceNumberFull = `${periodLabel.replace('-', '')}${invoiceNumber.slice(4)}`;
     const placeholders = {
         period: periodLabel,
         dueDate: args['due-date'] || dueDate,
         invoiceNumber,
+        invoiceNumberFull,
         senderName: args['sender-name'] || CONFIG.email.senderName,
         subjectInitials: args['subject-initials'] || CONFIG.email.subjectInitials,
         to
